@@ -44,5 +44,9 @@
       var options = {};
       var network = new vis.Network(container, data, options);
     </script>
+    <h1>Sessions:</h1>
+    {% for sess in sessions %}
+        <button onclick="location.href='/session/{{ sess }}';">Session #{{ sess }}</button>
+    {% endfor %}
   </body>
 </html>
