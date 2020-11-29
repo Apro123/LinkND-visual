@@ -15,6 +15,7 @@ def getSessions():
 
 @app.route('/session/<num>')
 def getSessionData(num=None):
+    #serve static processed data files
     return render_template("session.html", sess=num)
 
 @app.route('/', methods=['GET'])
