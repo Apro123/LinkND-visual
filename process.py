@@ -43,9 +43,9 @@ for i in range(len(files)):
 
                 #extract all numbers from data
                 data = timeAndData[1].split(",")
-                for i in range(len(data)):
+                for j in range(len(data)):
                     #data[i] = each data point
-                    for num in data[i]:
+                    for num in data[j]:
                         try:
                             lineToWrite += str(int(num))
                         except:
