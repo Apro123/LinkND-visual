@@ -3,8 +3,118 @@
 <head>
     <meta charset="UTF-8">
     <title>Session #{{ sess }}</title>
+    <script type="text/javascript" src="https://unpkg.com/vis-data@latest/peer/umd/vis-data.min.js"></script>
+    <script type="text/javascript" src="https://unpkg.com/vis-network@latest/peer/umd/vis-network.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="https://unpkg.com/vis-network/styles/vis-network.min.css" />
 </head>
 <body>
 <h1>Session #{{ sess }}</h1>
+<p>{{ d }}</p>
+<div id="mynetwork" style="
+    height: 500px;
+    width: 1000px;
+    border-color: blue;
+    border-style: groove;
+"></div>
+
+<script type="text/javascript">
+    function getData(data) {
+        return data;
+    }
+
+    rawdata = getData({{ data|safe }});
+
+    function calculateAverages(rawdata) {
+        for (var i in rawdata) {
+        {#    rawdata = [{node:, data:}, ...]#}
+    {#        cacluate averages#}
+            rawdata[i]['count'] = rawdata[i]['data'].length
+
+            rawdata[i]['avg'] = []; //each element will have four elements [from, to, avg, count]
+
+            for (const pt of rawdata[i]['data']) {
+                var point = pt.split(",");
+                var from = parseInt(point[1]);
+                var to = parseInt(point[2]);
+                var linkQuality = parseInt(point[3]);
+
+                //check if from and to exists
+                var found = false;
+                for(let j = 0; j < rawdata[i]['avg'].length; j++) {
+                  if(rawdata[i]['avg'][j][0] === from && rawdata[i]['avg'][j][1] === to) {
+                    found = true;
+                    rawdata[i]['avg'][j][2] += linkQuality; //total calc for avg
+                    rawdata[i]['avg'][j][3] += 1 //count for avg calc
+                  }
+                }
+                if(!found) {
+                    rawdata[i]['avg'].push([from, to, linkQuality, 1]);
+                }
+                {#rawdata[i]['avg'].append()#}
+            }
+            //calculate final averages
+            for(let j = 0; j < rawdata[i]['avg'].length; j++) {
+                //avg data = total/count divided by 15 which is the scaling max
+                rawdata[i]['avg'][j][2] = (rawdata[i]['avg'][j][2]/rawdata[i]['avg'][j][3])/15
+            }
+
+            console.log(rawdata[i]);
+        }
+    }
+
+    calculateAverages(rawdata);
+
+    console.log(rawdata);
+
+    {#data = [node:2, data: []] #}
+    function drawNetworkAvg(data) {
+        // add the nodes
+        var ds = []
+        for(var i in data) {
+            ds.append({id:i+1, label: "Node " +str(i+1)})
+        }
+        var nodes = new vis.Datset(ds);
+
+        //add edges with weight
+        ds = []
+
+        for(var i in data) {
+            ds.append()
+        }
+        var edges = new vis.Datset()
+
+    }
+
+    {#drawNetworkAvg(rawdata)#}
+
+    {#var nodes = new vis.DataSet([#}
+    {#    { id: 1, label: "Node 1" },#}
+    {#    { id: 2, label: "Node 2" },#}
+    {#    { id: 3, label: "Node 3" },#}
+    {#    { id: 4, label: "Node 4" },#}
+    {#    { id: 5, label: "Node 5" }#}
+    {#  ]);#}
+    {##}
+    {#    // create an array with edges#}
+    {#  var edges = new vis.DataSet([#}
+    {#    { from: 1, to: 3 },#}
+    {#    { from: 1, to: 2 },#}
+    {#    { from: 2, to: 4 },#}
+    {#    { from: 2, to: 5 },#}
+    {#    { from: 3, to: 3 }#}
+    {#  ]);#}
+    {##}
+    {#  // create a network#}
+    {#  var container = document.getElementById("mynetwork");#}
+    {#  var data = {#}
+    {#    nodes: nodes,#}
+    {#    edges: edges#}
+    {#  };#}
+    {#  var options = {};#}
+    {#  var network = new vis.Network(container, data, options);#}
+</script>
+
+{#<script type="text/javascript" src="{{ url_for('static', filename='index.js') }}">#}
+
 </body>
 </html>
