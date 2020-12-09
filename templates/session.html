@@ -3,19 +3,40 @@
 <head>
     <meta charset="UTF-8">
     <title>Session #{{ sess }}</title>
-    <script type="text/javascript" src="https://unpkg.com/vis-data@latest/peer/umd/vis-data.min.js"></script>
-    <script type="text/javascript" src="https://unpkg.com/vis-network@latest/peer/umd/vis-network.min.js"></script>
-    <link rel="stylesheet" type="text/css" href="https://unpkg.com/vis-network/styles/vis-network.min.css" />
-</head>
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script></head>
+{#    <script type="text/javascript" src="https://unpkg.com/vis-data@latest/peer/umd/vis-data.min.js"></script>#}
+{#<script type="text/javascript" src="https://unpkg.com/vis-network@latest/peer/umd/vis-network.min.js"></script>#}
+{#<link rel="stylesheet" type="text/css" href="https://unpkg.com/vis-network/styles/vis-network.min.css" />#}
 <body>
 <h1>Session #{{ sess }}</h1>
 <p>{{ d }}</p>
 <div id="mynetwork" style="
-    height: 500px;
-    width: 1000px;
-    border-color: blue;
+    height: 50vh;
+    width: 100vw;
+    border-color: #0000ff;
     border-style: groove;
 "></div>
+<div style="width: 45vw; float: left">
+<h4>From Node 1 to Node 2:</h4>
+<table border='1' id='tble'>
+<tbody>
+<tr><td>Node 1</td><td>Node 2</td> <td>Link Quality (of 255)</td> <td>Number of Data Points</td></tr>
+{#<div id="tble">#}
+{#</div>#}
+</tbody>
+</table>
+</div>
+
+<div style="width: 45vw; float: right">
+<h3>Date: </h3>
+<p id="date"></p>
+
+<h4>Input custom date</h4>
+<h5>FROM date:</h5>
+<input id="minDate" type="datetime-local" value="" step="1">
+<h5>TO date:</h5>
+<input id="maxDate" type="datetime-local" value="" step="1">
+</div>
 
 <script type="text/javascript">
     function getData(data) {
@@ -24,10 +45,12 @@
 
     rawdata = getData({{ data|safe }});
 
+    var minDate = Date.now();
+    var maxDate = 0;
+
     function calculateAverages(rawdata) {
         for (var i in rawdata) {
         {#    rawdata = [{node:, data:}, ...]#}
-    {#        cacluate averages#}
             rawdata[i]['count'] = rawdata[i]['data'].length
 
             rawdata[i]['avg'] = []; //each element will have four elements [from, to, avg, count]
@@ -38,7 +61,20 @@
                 var to = parseInt(point[2]);
                 var linkQuality = parseInt(point[3]);
 
-                //check if from and to exists
+                var date = parseFloat(pt.split(" ")[0])*1000;
+                {#console.log(date);#}
+                {#let options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }; //toLocaleString('en-us', options)#}
+                {#console.log((new Date(0)).setUTCSeconds(date));#}
+                {#console.log((new Date(date)));#}
+                var temp = new Date(date);
+                if(temp > maxDate) {
+                    maxDate = temp;
+                }
+                if(temp < minDate) {
+                    minDate = temp;
+                }
+
+                //check if from and to exists in local node
                 var found = false;
                 for(let j = 0; j < rawdata[i]['avg'].length; j++) {
                   if(rawdata[i]['avg'][j][0] === from && rawdata[i]['avg'][j][1] === to) {
@@ -50,42 +86,124 @@
                 if(!found) {
                     rawdata[i]['avg'].push([from, to, linkQuality, 1]);
                 }
-                {#rawdata[i]['avg'].append()#}
             }
-            //calculate final averages
+            //calculate final averages for local
             for(let j = 0; j < rawdata[i]['avg'].length; j++) {
-                //avg data = total/count divided by 15 which is the scaling max
-                rawdata[i]['avg'][j][2] = (rawdata[i]['avg'][j][2]/rawdata[i]['avg'][j][3])/15
+                //avg data = total/count * 15/255 because 15 is the scaling max for the edge nodes
+                rawdata[i]['avg'][j][2] = (rawdata[i]['avg'][j][2]/rawdata[i]['avg'][j][3]) //*15/255
             }
 
-            console.log(rawdata[i]);
+            //sorting would not do much and may impede performance
+
+            {#console.log(rawdata[i]);#}
         }
+
+        var globalAvg = rawdata[0]['avg']; //combine all the averages based on weight of counted (aggregation)
+
+        for(let i = 1; i < rawdata.length; i++) { //each node
+            for(let j = 0; j < rawdata[i]['avg'].length; j++) { //looping through all the avg at this point
+                var pt = rawdata[i]['avg'][j]; // each avg point
+
+                // need to loop through and add to the global average
+                var found = false;
+                for(let k = 0; k < globalAvg.length; k++) {
+                  if(pt[0] === globalAvg[k][0] && pt[1] === globalAvg[k][1]) {
+                    //from and to match
+                    found = true;
+                    globalAvg[k][2] = globalAvg[k][2] * (globalAvg[k][3])/(globalAvg[k][3] + pt[3]) + pt[2]*(pt[3])/(globalAvg[k][3] + pt[3]);
+                    globalAvg[k][3] += pt[3];
+                  }
+                }
+                if(!found) {
+                    globalAvg.append(pt);
+                }
+            }
+        }
+
+        return globalAvg;
     }
 
-    calculateAverages(rawdata);
+    var globalAvg = calculateAverages(rawdata);
 
-    console.log(rawdata);
+    {#console.log(rawdata);#}
+    {#console.log(globalAvg);#}
 
-    {#data = [node:2, data: []] #}
-    function drawNetworkAvg(data) {
+    {#data = global avg #}
+    function drawNetworkAvg(data, numNodes) {
         // add the nodes
-        var ds = []
-        for(var i in data) {
-            ds.append({id:i+1, label: "Node " +str(i+1)})
+        var nodes = []
+        for(let i = 1; i <= numNodes; i++) {
+            nodes.push({id:i, label: "Node " + (i).toString()});
         }
-        var nodes = new vis.Datset(ds);
 
         //add edges with weight
-        ds = []
+        var edges = [];
+        var includedEdges = []; //[from, to]
+        var table = document.getElementById("tble"); //table to fill out with values
 
-        for(var i in data) {
-            ds.append()
+        for(let i = 0; i < data.length; i++) {
+            var found = false;
+            for(let j = 0; j < includedEdges.length; j++) {
+                if(includedEdges[j][0] === data[i][1] && includedEdges[j][1] === data[i][0]) {
+                    found = true;
+                }
+            }
+            if(!found) {
+                edges.push({
+                    from: data[i][0],
+                    to: data[i][1],
+                    value: data[i][2]*15/255 //max is 15 for width
+                });
+                includedEdges.push([data[i][0], data[i][1]]);
+            }
+            var row = table.insertRow(i+1);
+            row.insertCell(0).innerHTML = data[i][0]; //from
+            row.insertCell(1).innerHTML = data[i][1]; //to
+            row.insertCell(2).innerHTML = data[i][2]; //link quality
+            row.insertCell(3).innerHTML = data[i][3]; //number data points
         }
-        var edges = new vis.Datset()
+
+        document.getElementById("date").innerHTML = "<h5>From:</h5>" + minDate + "<br> <h5>To:</h5>" + maxDate;
+        {#console.log(edges);#}
+        {#console.log(includedEdges).toISOString();#}
+        var minDateControl = document.getElementById("minDate");
+        minDateControl.value = minDate.toISOString().slice(0,-1);
+        var maxDateControl = document.getElementById("maxDate");
+        maxDateControl.value = maxDate.toISOString().slice(0,-1);
+
+        var container = document.getElementById("mynetwork");
+        var data = {
+            nodes: nodes,
+            edges: edges
+        }
+
+        var options = {
+          nodes: {
+            shape: "dot",
+          },
+          edges: {
+            arrows: {
+                to: {
+                    enabled: false,
+                    type: "arrow"
+                }
+            }
+          },
+          physics: {
+            barnesHut: {
+              avoidOverlap:0
+            },
+          },
+          {#configure: {#}
+          {#  enabled: true,#}
+          {#  showButton: true#}
+          {#}#}
+        };
+        network = new vis.Network(container, data, options);
 
     }
 
-    {#drawNetworkAvg(rawdata)#}
+    drawNetworkAvg(globalAvg, rawdata.length);
 
     {#var nodes = new vis.DataSet([#}
     {#    { id: 1, label: "Node 1" },#}
