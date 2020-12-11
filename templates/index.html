@@ -4,8 +4,26 @@
     <title>LinkND</title>
       <script type="text/javascript" src="https://unpkg.com/vis-data@latest/peer/umd/vis-data.min.js"></script>
     <script type="text/javascript" src="https://unpkg.com/vis-network@latest/peer/umd/vis-network.min.js"></script>
+    <script type="text/javascript" src="https://unpkg.com/vis-network@latest/peer/umd/vis-network.min.js"></script>
     <link rel="stylesheet" type="text/css" href="https://unpkg.com/vis-network/styles/vis-network.min.css" />
-  <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+
+      <script type="text/javascript" src="https://unpkg.com/moment@latest"></script>
+{#<script type="text/javascript" src="https://unpkg.com/vis-data@latest/peer/umd/vis-data.min.js"></script>#}
+{#<script type="text/javascript" src="https://unpkg.com/vis-timeline@latest/peer/umd/vis-timeline-graph2d.min.js"></script>#}
+{#<link rel="stylesheet" type="text/css" href="https://unpkg.com/vis-timeline/styles/vis-timeline-graph2d.min.css" />#}
+
+      <link href="https://visjs.github.io/vis-timeline/styles/vis-timeline-graph2d.min.css" rel="stylesheet" type="text/css">
+      <script src="https://visjs.github.io/vis-timeline/standalone/umd/vis-timeline-graph2d.min.js"></script>
+
+      <link rel="stylesheet" href="https://leeoniya.github.io/uPlot/src/uPlot.css">
+<script src="https://leeoniya.github.io/uPlot/dist/uPlot.iife.min.js"></script>
+
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.4/Chart.min.js"></script>
+{#      <script src="https://www.chartjs.org/samples/latest/utils.js"></script>#}
+
+{#      <script type="text/javascript" src="{{ url_for('static', filename='index.js') }}">#}
+
+{#  <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>#}
   </head>
   <body>
 
@@ -28,6 +46,26 @@
             </tbody>
         </table>
     </div>
+
+    <div style="width: 45vw; float: right">
+{#        <h3>Date: </h3>#}
+{#        <p id="date"></p>#}
+
+        <h4>Input custom date for node EDGES graph</h4>
+        <h5>FROM date:</h5>
+        <input id="minDate" type="datetime-local" value="" step="1">
+        <h5>TO date:</h5>
+        <input id="maxDate" type="datetime-local" value="" step="1">
+        <br>
+        <label for="Now?">Automatic to Max Date?</label>
+        <input type="checkbox" id="dateNow" checked="true" name="Now?" value="" onclick="flipToDate();">
+        <br><br><br>
+        <button id="btn" onclick="createGraphs();">Create Graphs Below</button>
+    </div>
+    <br><br>
+    <div id="graphs" style="padding-top: 50vh">
+
+    </div>
 {#    <div id="test"></div>#}
     <script type="text/javascript">
         var nodes, edges, network; //for the actual network
@@ -35,13 +73,19 @@
         var nodesID = 1, edgesID = 1; //current nodes/edges id
         var size = 550; //size of stored buffer
         //stored points = [[from,to,link], ...]
-        var storedPoints = new Array(size).fill(null); //stored the stream data //limited size determined by size
+        var storedPoints = new Array(size).fill(null); //stored the stream data //limited size determined by size //TODO: stack using .shift method()
         {#//.reduce((total,x) => (x!=-1 ? total+1 : total), 0) used to tell us how many actual elements in there#}
         {#var flagForReduceFunc; //used to no longer use the reduce function as there is always enough data aka when reduce == size#}
         //read and update based on pointer
         var pointer = 0;
 
         var processedData = [] //[[from,to,totalLink, numDataPTS, edgesID], ...] edges id doubles as table row id
+
+        var changeMaxDate = true;
+
+        //holds the graphs
+
+        var allGraphs = []
 
         async function init() {
             const response = await fetch("/stream");
@@ -64,22 +108,48 @@
         function handleData(arr) {
             for(var i = 0; i < arr.length; i++) {
                 try {
-                    var pointData = arr[i].split(" ")[1].split(",");
-                    var fromN = parseInt(pointData[1]);
-                    var toN = parseInt(pointData[2]);
-                    var linkQuality = parseInt(pointData[3]);
+                    //split the data
+                    var raw = arr[i].split(" ");
 
-                    //add to processed data and (stored points and increasing the pointer)
+                    if(raw.length == 2) {
+                        //get the max time
+                        var maxDate = document.getElementById('maxDate');
+                        var dt = parseFloat(raw[0])*1000;
+                        if(maxDate.valueAsNumber) {
+                            if(maxDate.valueAsNumber < dt) {
+                                if(changeMaxDate) {
+                                    maxDate.value = new Date(dt).toISOString().slice(0,-1);
+                                }
+                                maxDate.max = new Date(dt).toISOString().slice(0,-1);
+                                document.getElementById("minDate").max = new Date(dt).toISOString().slice(0,-1);
+                            }
+                        } else {
+                            if(changeMaxDate) {
+                                maxDate.value = new Date(dt).toISOString().slice(0,-1);
+                            }
+                            maxDate.max = new Date(dt).toISOString().slice(0,-1);
+                            document.getElementById("minDate").max = new Date(dt).toISOString().slice(0,-1);
+                        }
 
-                    //add to the stored points and increase the pointer
-                    var temp = storedPoints[pointer]; //delete from processed data
-                    storedPoints[pointer] = [fromN, toN, linkQuality]
-                    pointer += 1;
-                    if(pointer == size) {
-                        pointer = 0;
+                        //do the point data stuff
+                        var pointData = raw[1].split(",");
+                        var fromN = parseInt(pointData[1]);
+                        var toN = parseInt(pointData[2]);
+                        var linkQuality = parseInt(pointData[3]);
+
+                        //add to processed data and (stored points and increasing the pointer)
+
+                        //add to the stored points and increase the pointer
+                        var temp = storedPoints[pointer]; //delete from processed data
+                        storedPoints[pointer] = [fromN, toN, linkQuality]
+                        pointer += 1;
+                        if(pointer == size) {
+                            pointer = 0;
+                        }
+
+                        addProcessedData([fromN, toN, linkQuality], temp);
                     }
 
-                    addProcessedData([fromN, toN, linkQuality], temp)
 
                 } catch(error) {
                     //do nothing
@@ -109,13 +179,13 @@
                         {#console.log(edges.getIds());#}
                         {#network.redraw();#}
                         {#console.log(processedData[i]);#}
-                    {#} else {#}
+                    //} else {
                         //update the edge
                         edges.update({
                             id: processedData[i][4],
                             label: "Link Quality: " + processedData[i][2]/processedData[i][3]
                         });
-                    {#}#}
+                    //}
 
                     //either way update the table
                     var cells = table.rows[processedData[i][4]].cells;
@@ -173,6 +243,174 @@
             }
         }
 
+        function flipToDate() {
+            changeMaxDate = document.getElementById('dateNow').checked;
+            var maxD = document.getElementById('maxDate');
+            maxD.value = maxD.max;
+            {#// if now then make the max date disabled#}
+            {#var checked = document.getElementById("dateNow").checked;#}
+            {#var maxDate = document.getElementById("maxDate");#}
+            {#maxDate.value = (new Date).toISOString().slice(0,-1);#}
+            {#maxDate.disabled = checked;#}
+        }
+
+        async function createGraphs() {
+            //get the values and request server for data
+            //disable the button
+            document.getElementById("btn").disabled = true;
+            var minDate = document.getElementById("minDate").valueAsNumber;
+            var maxDate = document.getElementById("maxDate").valueAsNumber;
+            {#console.log((new Date(minDate)).toISOString());#}
+            {#console.log((new Date(maxDate)).toISOString());#}
+
+            const response = await fetch("/getInterval/"+minDate+"/"+maxDate);
+            const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+            const { value } = await reader.read();
+            var data = JSON.parse(value);
+            {#console.log(data);#}
+
+            var graphs = document.getElementById("graphs");
+            {#for(var i = 0; i < allGraphs.length; i++) {#}
+            {#    try {#}
+            {#        allGraphs[i].destroy();#}
+            {#    } catch(er) {#}
+            {#    }#}
+            //}
+            graphs.innerHTML = ''; //clear any existing graphs
+
+            for(var i = 0; i < data.length; i++) {
+
+                var tempGraph = document.createElement("canvas");
+
+                const ctx = tempGraph.getContext('2d');
+
+                var pts = [];
+                for(var j = 0; j < data[i]['data'].length; j++) {
+                    pts.push({
+                        t: (new Date(data[i]['data'][j][0])).toISOString(),
+                        y: parseInt(data[i]['data'][j][1])
+                    });
+                }
+                const datat = {
+                    // Labels should be Date objects
+                    {#labels: [new Date(2017, 08, 16), new Date(2017, 08, 17), new Date(2017, 08, 18)],#}
+                    datasets: [{
+                        fill: false,
+                        label: "Link Quality (of 255) from node: " + data[i]['from'] + " to node " + data[i]['to'],
+                        data: pts,
+                        borderColor: '#fe8b36',
+                        backgroundColor: '#fe8b36',
+                        lineTension: 0,
+                    }]
+                }
+                const options = {
+                    type: 'line',
+                    data: datat,
+                    options: {
+                        fill: false,
+                        responsive: true,
+                        scales: {
+                            xAxes: [{
+                                type: 'time',
+                                display: true,
+                                scaleLabel: {
+                                    display: true,
+                                    labelString: "Date",
+                                }
+                            }],
+                            yAxes: [{
+                                ticks: {
+                                    beginAtZero: true,
+                                },
+                                display: true,
+                                scaleLabel: {
+                                    display: true,
+                                    labelString: "Page Views",
+                                }
+                            }]
+                        }
+                    }
+                }
+                const chart = new Chart(ctx, options);
+                graphs.appendChild(tempGraph);
+
+                {#var uplotData = [[],[]]#}
+                {#for(var j = 0; j < data[i]['data'].length ; j++) {#}
+                {#    uplotData[0].push(data[i]['data'][j][0]/1000);#}
+                {#    uplotData[1].push(data[i]['data'][j][1]);#}
+                //}
+                {##}
+                {#const opts = {#}
+                {#    title: "Link Quality (of 255) from node: " + data[i]['from'] + " to node " + data[i]['to']#}
+                //}
+                {##}
+                {#let uplot = new uPlot.Line(opts, uplotData);#}
+                {##}
+                {#graphs.appendChild(uplot.root);#}
+
+                {#var tempGraph = document.createElement("div");#}
+                {##}
+                {#var items = new vis.DataSet();#}
+                {#for(var j = 0; j < data[i]['data'].length; j++) {#}
+                {#    console.log(data[i]['data'][j]);#}
+                {#    if(j % 10 == 0) {#}
+                {#        items.update({#}
+                {#            id: (new Date(data[i]['data'][j][0])).toISOString(),#}
+                {#            x: (new Date(data[i]['data'][j][0])).toISOString(),#}
+                {#            y: parseInt(data[i]['data'][j][1])#}
+                {#        });#}
+                {#    }#}
+
+                    {#console.log(parseInt(data[i]['data'][j][1]));#}
+                //}
+                {##}
+                {#console.log(items.get());#}
+                {##}
+                {#var opt = {#}
+                {#    dataAxis: {#}
+                {##}
+                {#        right: {#}
+                {#            title: {#}
+                {#                text: "Link Quality (of 255) from node: " + data[i]['from'] + " to node " + data[i]['to']#}
+                {#            }#}
+                {#        }#}
+                {#    },#}
+                {#    start: (new Date(minDate)).toISOString(),#}
+                {#    end: (new Date(maxDate)).toISOString()#}
+                //}
+                {##}
+                {#items = [#}
+                {#  {x: '2013-04-20T14:48:00.000Z', y: 10},#}
+                {#  {x: '2013-04-14T14:48:00.000Z', y: 25},#}
+                {#  {x: '2013-04-18T14:48:00.000Z', y: 30},#}
+                {#  {x: '2013-04-16', y: 10},#}
+                {#  {x: '2013-04-25', y: 15},#}
+                {#  {x: '2013-04-27', y: 30},#}
+                {#  {x: '2020-12-11T07:32:05.450Z', y: 30}#}
+                {#];#}
+                {##}
+                {#var graph2d = new vis.Graph2d(tempGraph,items, opt);#}
+                {##}
+                {#allGraphs.push(graph2d);#}
+                {##}
+                {#graphs.appendChild(tempGraph);#}
+                {#graphs.appendChild(document.createElement("br"));#}
+            }
+
+            document.getElementById("btn").disabled = false;
+        }
+
+        async function getMinDate() {
+            const response = await fetch("/getMinDate");
+            const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+
+            const { value } = await reader.read();
+            var minDate = (new Date(parseInt(value.split('.')[0]))).toISOString().slice(0,-1);
+            document.getElementById('minDate').value = minDate;
+            document.getElementById('minDate').min = minDate;
+            document.getElementById('maxDate').min = minDate;
+        }
+
         nodes = new vis.DataSet();
         {#nodes.on('*', function (event, properties, senderId) {#}
           {#console.log('event', event, properties);#}
@@ -207,8 +445,14 @@
         };
         network = new vis.Network(container, data, options);
         init();
+
+        getMinDate();
+
         //1606604963.01 * 1000
         //1607581828157
+        //1496275200000
+        //1607630796390 mindate
+
         {#console.log(Date.now());#}
 
     </script>
