@@ -39,10 +39,13 @@
         border-style: groove;
     "></div>
     <div style="width: 45vw; float: left">
-    <h4>From Node 1 to Node 2:</h4>
+        <label for="quantity">Buffer Size:</label>
+        <input type="number" id="quantity" name="quantity" min="200">
+        <button id="size-btn" onclick="changeBuffer();">Modify total Buffer</button>
+        <h4>From Source Node to Destination Node:</h4>
         <table border='1' id='tble'>
             <tbody>
-                <tr><td>Source Node</td><td>Destination Node</td> <td>Link Quality (of 255)</td> <td>Number of Data Points</td></tr>
+                <tr><td>Src Node</td><td>Dest Node</td> <td>Link Quality (of 255)</td> <td>Number of Data Points</td></tr>
             </tbody>
         </table>
     </div>
@@ -140,10 +143,14 @@
                         //add to processed data and (stored points and increasing the pointer)
 
                         //add to the stored points and increase the pointer
+                        //check if you need to add points based on the size variable
+                        while(storedPoints.length < size) {
+                            storedPoints.push(null);
+                        }
                         var temp = storedPoints[pointer]; //delete from processed data
                         storedPoints[pointer] = [fromN, toN, linkQuality]
                         pointer += 1;
-                        if(pointer == size) {
+                        if(pointer >= size) {
                             pointer = 0;
                         }
 
@@ -270,12 +277,12 @@
             {#console.log(data);#}
 
             var graphs = document.getElementById("graphs");
-            {#for(var i = 0; i < allGraphs.length; i++) {#}
-            {#    try {#}
-            {#        allGraphs[i].destroy();#}
-            {#    } catch(er) {#}
-            {#    }#}
-            //}
+            for(var i = 0; i < allGraphs.length; i++) {
+                try {
+                    allGraphs[i].destroy();
+                } catch(er) {
+                }
+            }
             graphs.innerHTML = ''; //clear any existing graphs
 
             for(var i = 0; i < data.length; i++) {
@@ -333,6 +340,7 @@
                 }
                 const chart = new Chart(ctx, options);
                 graphs.appendChild(tempGraph);
+                allGraphs.push(chart);
 
                 {#var uplotData = [[],[]]#}
                 {#for(var j = 0; j < data[i]['data'].length ; j++) {#}
@@ -411,6 +419,10 @@
             document.getElementById('maxDate').min = minDate;
         }
 
+        function changeBuffer() {
+            size = parseInt(document.getElementById('quantity').value);
+        }
+
         nodes = new vis.DataSet();
         {#nodes.on('*', function (event, properties, senderId) {#}
           {#console.log('event', event, properties);#}
@@ -447,6 +459,8 @@
         init();
 
         getMinDate();
+
+        document.getElementById('quantity').value = size;
 
         //1606604963.01 * 1000
         //1607581828157
