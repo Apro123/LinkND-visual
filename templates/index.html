@@ -2,13 +2,215 @@
 <html>
   <head>
     <title>LinkND</title>
+      <script type="text/javascript" src="https://unpkg.com/vis-data@latest/peer/umd/vis-data.min.js"></script>
+    <script type="text/javascript" src="https://unpkg.com/vis-network@latest/peer/umd/vis-network.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="https://unpkg.com/vis-network/styles/vis-network.min.css" />
+  <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
   </head>
   <body>
 
-    <h1>Sessions:</h1>
-    {% for sess,numNodes in sessions.items() %}
-        <button onclick="location.href='/session/{{ sess }}';">Session #{{ sess }}</button>
-        <p>Has {{ numNodes }} nodes</p>
-    {% endfor %}
+    <h1>LinkND:</h1>
+{#    {% for sess,numNodes in sessions.items() %}#}
+{#        <button onclick="location.href='/session/{{ sess }}';">Session #{{ sess }}</button>#}
+{#        <p>Has {{ numNodes }} nodes</p>#}
+{#    {% endfor %}#}
+    <div id="mynetwork" style="
+        height: 50vh;
+        width: 100vw;
+        border-color: #0000ff;
+        border-style: groove;
+    "></div>
+    <div style="width: 45vw; float: left">
+    <h4>From Node 1 to Node 2:</h4>
+        <table border='1' id='tble'>
+            <tbody>
+                <tr><td>Source Node</td><td>Destination Node</td> <td>Link Quality (of 255)</td> <td>Number of Data Points</td></tr>
+            </tbody>
+        </table>
+    </div>
+{#    <div id="test"></div>#}
+    <script type="text/javascript">
+        var nodes, edges, network; //for the actual network
+        var table; //for filling up the table values
+        var nodesID = 1, edgesID = 1; //current nodes/edges id
+        var size = 550; //size of stored buffer
+        //stored points = [[from,to,link], ...]
+        var storedPoints = new Array(size).fill(null); //stored the stream data //limited size determined by size
+        {#//.reduce((total,x) => (x!=-1 ? total+1 : total), 0) used to tell us how many actual elements in there#}
+        {#var flagForReduceFunc; //used to no longer use the reduce function as there is always enough data aka when reduce == size#}
+        //read and update based on pointer
+        var pointer = 0;
+
+        var processedData = [] //[[from,to,totalLink, numDataPTS, edgesID], ...] edges id doubles as table row id
+
+        async function init() {
+            const response = await fetch("/stream");
+            const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+
+            while (true) {
+              const { value, done } = await reader.read();
+              {#if (done) break;#} //does not stop
+              {#var div = document.getElementById("test");#}
+              {#test.innerHTML += value + "<br>";#}
+              if(value) {
+                  var val = value.split()[0].split('\n');
+                  val.pop();
+                  handleData(val);
+                  {#console.log(val);#}
+              }
+            }
+        }
+
+        function handleData(arr) {
+            for(var i = 0; i < arr.length; i++) {
+                try {
+                    var pointData = arr[i].split(" ")[1].split(",");
+                    var fromN = parseInt(pointData[1]);
+                    var toN = parseInt(pointData[2]);
+                    var linkQuality = parseInt(pointData[3]);
+
+                    //add to processed data and (stored points and increasing the pointer)
+
+                    //add to the stored points and increase the pointer
+                    var temp = storedPoints[pointer]; //delete from processed data
+                    storedPoints[pointer] = [fromN, toN, linkQuality]
+                    pointer += 1;
+                    if(pointer == size) {
+                        pointer = 0;
+                    }
+
+                    addProcessedData([fromN, toN, linkQuality], temp)
+
+                } catch(error) {
+                    //do nothing
+                }
+            }
+        }
+
+        function addProcessedData(newArr, oldArr) {
+            var found = false;
+            var foundO = false;
+            for(let i = 0; i < processedData.length; i++) {
+                //if from and to are the same
+                if(processedData[i][0] === newArr[0] && processedData[i][1] === newArr[1]) {
+                    processedData[i][2] += newArr[2]; //add to total link
+                    processedData[i][3] += 1; //increment num data points
+                    found = true;
+
+                    //remove not working
+                    {#if(processedData[i][2] == 0) {#}
+                    {#    edges.update({#}
+                    {#        id: processedData[i][4],#}
+                    {#        label: "NO LINK"#}
+                    {#    });#}
+                    {##}
+                        {#console.log(edges.getIds());#}
+                        {#edges.remove([processedData[i][4]]);#}
+                        {#console.log(edges.getIds());#}
+                        {#network.redraw();#}
+                        {#console.log(processedData[i]);#}
+                    {#} else {#}
+                        //update the edge
+                        edges.update({
+                            id: processedData[i][4],
+                            label: "Link Quality: " + processedData[i][2]/processedData[i][3]
+                        });
+                    {#}#}
+
+                    //either way update the table
+                    var cells = table.rows[processedData[i][4]].cells;
+                    cells[2].innerHTML = processedData[i][2]/processedData[i][3];
+                    cells[3].innerHTML = processedData[i][3];
+                }
+                //remove old arr data from processed data
+                if(oldArr != null && processedData[i][0] === oldArr[0] && processedData[i][1] === oldArr[1]) {
+                    processedData[i][2] -= oldArr[2];
+                    processedData[i][3] -= 1;
+                    foundO = true;
+                }
+
+                if(found && found0) {
+                    break;
+                }
+            }
+
+            if(!found) {
+                //add the nodes
+                nodes.update({
+                    id: newArr[0],
+                    label: "Node " + newArr[0]
+                });
+
+                nodes.update({
+                    id: newArr[1],
+                    label: "Node " + newArr[1]
+                });
+
+                //add an edge
+                edges.update({
+                    id: edgesID,
+                    from: newArr[0],
+                    to: newArr[1],
+                    label: "Link Quality: " + newArr[2]
+                });
+                //push new edge to processed data
+                processedData.push([newArr[0], newArr[1], newArr[2], 1, edgesID]);
+
+                //add row to the table with edges ID
+                table = document.getElementById("tble");
+                var row = table.insertRow(edgesID);
+                row.insertCell(0).innerHTML = newArr[0]; //from
+                row.insertCell(1).innerHTML = newArr[1]; //to
+                row.insertCell(2).innerHTML = newArr[2]; //link quality
+                row.insertCell(3).innerHTML = 1; //number data points
+
+                //increment edgesID
+                edgesID += 1;
+
+            }
+            if(!foundO && oldArr != null) {
+                console.log("ERROR SHOULD NOT BE HAPPENING");
+            }
+        }
+
+        nodes = new vis.DataSet();
+        {#nodes.on('*', function (event, properties, senderId) {#}
+          {#console.log('event', event, properties);#}
+        {#});#}
+        edges = new vis.DataSet();
+        {#edges.on('*', function (event, properties, senderId) {#}
+          {#console.log('event', event, properties);#}
+        {#});#}
+
+        var container = document.getElementById("mynetwork");
+        var data = {
+            nodes: nodes,
+            edges: edges
+        }
+        var options = {
+            nodes: {
+            shape: "dot",
+          },
+            edges: {
+            arrows: {
+                to: {
+                    enabled: false,
+                    type: "arrow"
+                }
+            }
+          },
+            physics: {
+            barnesHut: {
+              avoidOverlap:0.5
+            }
+          }
+        };
+        network = new vis.Network(container, data, options);
+        init();
+        //1606604963.01 * 1000
+        //1607581828157
+        {#console.log(Date.now());#}
+
+    </script>
   </body>
 </html>
