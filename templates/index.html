@@ -2,28 +2,9 @@
 <html>
   <head>
     <title>LinkND</title>
-      <script type="text/javascript" src="https://unpkg.com/vis-data@latest/peer/umd/vis-data.min.js"></script>
-    <script type="text/javascript" src="https://unpkg.com/vis-network@latest/peer/umd/vis-network.min.js"></script>
-    <script type="text/javascript" src="https://unpkg.com/vis-network@latest/peer/umd/vis-network.min.js"></script>
-    <link rel="stylesheet" type="text/css" href="https://unpkg.com/vis-network/styles/vis-network.min.css" />
-
-      <script type="text/javascript" src="https://unpkg.com/moment@latest"></script>
-{#<script type="text/javascript" src="https://unpkg.com/vis-data@latest/peer/umd/vis-data.min.js"></script>#}
-{#<script type="text/javascript" src="https://unpkg.com/vis-timeline@latest/peer/umd/vis-timeline-graph2d.min.js"></script>#}
-{#<link rel="stylesheet" type="text/css" href="https://unpkg.com/vis-timeline/styles/vis-timeline-graph2d.min.css" />#}
-
-      <link href="https://visjs.github.io/vis-timeline/styles/vis-timeline-graph2d.min.css" rel="stylesheet" type="text/css">
-      <script src="https://visjs.github.io/vis-timeline/standalone/umd/vis-timeline-graph2d.min.js"></script>
-
-      <link rel="stylesheet" href="https://leeoniya.github.io/uPlot/src/uPlot.css">
-<script src="https://leeoniya.github.io/uPlot/dist/uPlot.iife.min.js"></script>
-
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.4/Chart.min.js"></script>
-{#      <script src="https://www.chartjs.org/samples/latest/utils.js"></script>#}
-
-{#      <script type="text/javascript" src="{{ url_for('static', filename='index.js') }}">#}
-
-{#  <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>#}
+      <script type="text/javascript" src="{{ url_for('static', filename='moment.js') }}"></script>
+      <script type="text/javascript" src="{{ url_for('static', filename='Chart.min.js') }}"></script>
+      <script type="text/javascript" src="{{ url_for('static', filename='vis-network.min.js') }}"></script>
   </head>
   <body>
 
@@ -39,13 +20,10 @@
         border-style: groove;
     "></div>
     <div style="width: 45vw; float: left">
-        <label for="quantity">Buffer Size:</label>
-        <input type="number" id="quantity" name="quantity" min="200">
-        <button id="size-btn" onclick="changeBuffer();">Modify total Buffer</button>
         <h4>From Source Node to Destination Node:</h4>
         <table border='1' id='tble'>
             <tbody>
-                <tr><td>Src Node</td><td>Dest Node</td> <td>Link Quality (of 255)</td> <td>Number of Data Points</td></tr>
+                <tr><td>Src Node</td><td>Dest Node</td> <td>Link Quality %</td> <td>Number of Data Points</td></tr>
             </tbody>
         </table>
     </div>
@@ -74,9 +52,6 @@
         var nodes, edges, network; //for the actual network
         var table; //for filling up the table values
         var nodesID = 1, edgesID = 1; //current nodes/edges id
-        var size = 550; //size of stored buffer
-        //stored points = [[from,to,link], ...]
-        var storedPoints = new Array(size).fill(null); //stored the stream data //limited size determined by size //TODO: stack using .shift method()
         {#//.reduce((total,x) => (x!=-1 ? total+1 : total), 0) used to tell us how many actual elements in there#}
         {#var flagForReduceFunc; //used to no longer use the reduce function as there is always enough data aka when reduce == size#}
         //read and update based on pointer
@@ -121,17 +96,17 @@
                         if(maxDate.valueAsNumber) {
                             if(maxDate.valueAsNumber < dt) {
                                 if(changeMaxDate) {
-                                    maxDate.value = new Date(dt).toISOString().slice(0,-1);
+                                    maxDate.value = (new Date(dt)).toISOString().slice(0,-1);
                                 }
                                 maxDate.max = new Date(dt).toISOString().slice(0,-1);
                                 document.getElementById("minDate").max = new Date(dt).toISOString().slice(0,-1);
                             }
                         } else {
                             if(changeMaxDate) {
-                                maxDate.value = new Date(dt).toISOString().slice(0,-1);
+                                maxDate.value = (new Date(dt)).toISOString().slice(0,-1);
                             }
-                            maxDate.max = new Date(dt).toISOString().slice(0,-1);
-                            document.getElementById("minDate").max = new Date(dt).toISOString().slice(0,-1);
+                            maxDate.max = (new Date(dt)).toISOString().slice(0,-1);
+                            document.getElementById("minDate").max = (new Date(dt)).toISOString().slice(0,-1);
                         }
 
                         //do the point data stuff
@@ -142,19 +117,7 @@
 
                         //add to processed data and (stored points and increasing the pointer)
 
-                        //add to the stored points and increase the pointer
-                        //check if you need to add points based on the size variable
-                        while(storedPoints.length < size) {
-                            storedPoints.push(null);
-                        }
-                        var temp = storedPoints[pointer]; //delete from processed data
-                        storedPoints[pointer] = [fromN, toN, linkQuality]
-                        pointer += 1;
-                        if(pointer >= size) {
-                            pointer = 0;
-                        }
-
-                        addProcessedData([fromN, toN, linkQuality], temp);
+                        addProcessedData([fromN, toN, linkQuality]);
                     }
 
 
@@ -164,7 +127,7 @@
             }
         }
 
-        function addProcessedData(newArr, oldArr) {
+        function addProcessedData(newArr) {
             var found = false;
             var foundO = false;
             for(let i = 0; i < processedData.length; i++) {
@@ -175,38 +138,29 @@
                     found = true;
 
                     //remove not working
-                    {#if(processedData[i][2] == 0) {#}
-                    {#    edges.update({#}
-                    {#        id: processedData[i][4],#}
-                    {#        label: "NO LINK"#}
-                    {#    });#}
-                    {##}
-                        {#console.log(edges.getIds());#}
-                        {#edges.remove([processedData[i][4]]);#}
-                        {#console.log(edges.getIds());#}
-                        {#network.redraw();#}
-                        {#console.log(processedData[i]);#}
-                    //} else {
+                    if(processedData[i][2] <= 30) {
+                        edges.update({
+                            id: processedData[i][4],
+                            label: "0%"
+                        });
+
+                        edges.remove([processedData[i][4]]); //hopefully works
+                        network.redraw();
+                    } else {
                         //update the edge
                         edges.update({
                             id: processedData[i][4],
-                            label: "Link Quality: " + processedData[i][2]/processedData[i][3]
+                            label: ((processedData[i][2] / processedData[i][3]) / 2.55).toString() + "%"
                         });
-                    //}
+                    }
 
                     //either way update the table
                     var cells = table.rows[processedData[i][4]].cells;
-                    cells[2].innerHTML = processedData[i][2]/processedData[i][3];
+                    cells[2].innerHTML = ((processedData[i][2]/processedData[i][3])/2.55).toString() + "%";
                     cells[3].innerHTML = processedData[i][3];
                 }
-                //remove old arr data from processed data
-                if(oldArr != null && processedData[i][0] === oldArr[0] && processedData[i][1] === oldArr[1]) {
-                    processedData[i][2] -= oldArr[2];
-                    processedData[i][3] -= 1;
-                    foundO = true;
-                }
 
-                if(found && found0) {
+                if(found) {
                     break;
                 }
             }
@@ -228,7 +182,7 @@
                     id: edgesID,
                     from: newArr[0],
                     to: newArr[1],
-                    label: "Link Quality: " + newArr[2]
+                    label: (newArr[2]/2.55).toString() + "%"
                 });
                 //push new edge to processed data
                 processedData.push([newArr[0], newArr[1], newArr[2], 1, edgesID]);
@@ -254,11 +208,6 @@
             changeMaxDate = document.getElementById('dateNow').checked;
             var maxD = document.getElementById('maxDate');
             maxD.value = maxD.max;
-            {#// if now then make the max date disabled#}
-            {#var checked = document.getElementById("dateNow").checked;#}
-            {#var maxDate = document.getElementById("maxDate");#}
-            {#maxDate.value = (new Date).toISOString().slice(0,-1);#}
-            {#maxDate.disabled = checked;#}
         }
 
         async function createGraphs() {
@@ -267,8 +216,6 @@
             document.getElementById("btn").disabled = true;
             var minDate = document.getElementById("minDate").valueAsNumber;
             var maxDate = document.getElementById("maxDate").valueAsNumber;
-            {#console.log((new Date(minDate)).toISOString());#}
-            {#console.log((new Date(maxDate)).toISOString());#}
 
             const response = await fetch("/getInterval/"+minDate+"/"+maxDate);
             const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
@@ -295,7 +242,7 @@
                 for(var j = 0; j < data[i]['data'].length; j++) {
                     pts.push({
                         t: (new Date(data[i]['data'][j][0])).toISOString(),
-                        y: parseInt(data[i]['data'][j][1])
+                        y: (parseInt(data[i]['data'][j][1]))/2.55
                     });
                 }
                 const datat = {
@@ -303,7 +250,7 @@
                     {#labels: [new Date(2017, 08, 16), new Date(2017, 08, 17), new Date(2017, 08, 18)],#}
                     datasets: [{
                         fill: false,
-                        label: "Link Quality (of 255) from node: " + data[i]['from'] + " to node " + data[i]['to'],
+                        label: "Link Quality % from node: " + data[i]['from'] + " to node " + data[i]['to'],
                         data: pts,
                         borderColor: '#fe8b36',
                         backgroundColor: '#fe8b36',
@@ -341,68 +288,6 @@
                 const chart = new Chart(ctx, options);
                 graphs.appendChild(tempGraph);
                 allGraphs.push(chart);
-
-                {#var uplotData = [[],[]]#}
-                {#for(var j = 0; j < data[i]['data'].length ; j++) {#}
-                {#    uplotData[0].push(data[i]['data'][j][0]/1000);#}
-                {#    uplotData[1].push(data[i]['data'][j][1]);#}
-                //}
-                {##}
-                {#const opts = {#}
-                {#    title: "Link Quality (of 255) from node: " + data[i]['from'] + " to node " + data[i]['to']#}
-                //}
-                {##}
-                {#let uplot = new uPlot.Line(opts, uplotData);#}
-                {##}
-                {#graphs.appendChild(uplot.root);#}
-
-                {#var tempGraph = document.createElement("div");#}
-                {##}
-                {#var items = new vis.DataSet();#}
-                {#for(var j = 0; j < data[i]['data'].length; j++) {#}
-                {#    console.log(data[i]['data'][j]);#}
-                {#    if(j % 10 == 0) {#}
-                {#        items.update({#}
-                {#            id: (new Date(data[i]['data'][j][0])).toISOString(),#}
-                {#            x: (new Date(data[i]['data'][j][0])).toISOString(),#}
-                {#            y: parseInt(data[i]['data'][j][1])#}
-                {#        });#}
-                {#    }#}
-
-                    {#console.log(parseInt(data[i]['data'][j][1]));#}
-                //}
-                {##}
-                {#console.log(items.get());#}
-                {##}
-                {#var opt = {#}
-                {#    dataAxis: {#}
-                {##}
-                {#        right: {#}
-                {#            title: {#}
-                {#                text: "Link Quality (of 255) from node: " + data[i]['from'] + " to node " + data[i]['to']#}
-                {#            }#}
-                {#        }#}
-                {#    },#}
-                {#    start: (new Date(minDate)).toISOString(),#}
-                {#    end: (new Date(maxDate)).toISOString()#}
-                //}
-                {##}
-                {#items = [#}
-                {#  {x: '2013-04-20T14:48:00.000Z', y: 10},#}
-                {#  {x: '2013-04-14T14:48:00.000Z', y: 25},#}
-                {#  {x: '2013-04-18T14:48:00.000Z', y: 30},#}
-                {#  {x: '2013-04-16', y: 10},#}
-                {#  {x: '2013-04-25', y: 15},#}
-                {#  {x: '2013-04-27', y: 30},#}
-                {#  {x: '2020-12-11T07:32:05.450Z', y: 30}#}
-                {#];#}
-                {##}
-                {#var graph2d = new vis.Graph2d(tempGraph,items, opt);#}
-                {##}
-                {#allGraphs.push(graph2d);#}
-                {##}
-                {#graphs.appendChild(tempGraph);#}
-                {#graphs.appendChild(document.createElement("br"));#}
             }
 
             document.getElementById("btn").disabled = false;
@@ -419,18 +304,8 @@
             document.getElementById('maxDate').min = minDate;
         }
 
-        function changeBuffer() {
-            size = parseInt(document.getElementById('quantity').value);
-        }
-
         nodes = new vis.DataSet();
-        {#nodes.on('*', function (event, properties, senderId) {#}
-          {#console.log('event', event, properties);#}
-        {#});#}
         edges = new vis.DataSet();
-        {#edges.on('*', function (event, properties, senderId) {#}
-          {#console.log('event', event, properties);#}
-        {#});#}
 
         var container = document.getElementById("mynetwork");
         var data = {
@@ -459,15 +334,6 @@
         init();
 
         getMinDate();
-
-        document.getElementById('quantity').value = size;
-
-        //1606604963.01 * 1000
-        //1607581828157
-        //1496275200000
-        //1607630796390 mindate
-
-        {#console.log(Date.now());#}
 
     </script>
   </body>
